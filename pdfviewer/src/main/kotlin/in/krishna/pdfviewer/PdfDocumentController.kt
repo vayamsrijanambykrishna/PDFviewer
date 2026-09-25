@@ -1,9 +1,11 @@
 package `in`.krishna.pdfviewer
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.util.Size
 import java.io.Closeable
 
 internal class PdfDocumentController(
@@ -12,45 +14,87 @@ internal class PdfDocumentController(
 
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var renderer: PdfRenderer? = null
+    private var cachedPageCount = 0
 
     val pageCount: Int
-        get() = renderer?.pageCount ?: 0
+        @Synchronized get() = cachedPageCount
 
     val isOpen: Boolean
-        get() = renderer != null
+        @Synchronized get() = renderer != null
 
+    @Synchronized
     fun open(uri: Uri) {
         close()
 
         val descriptor = context.contentResolver
             .openFileDescriptor(uri, "r")
-            ?: throw IllegalArgumentException(
-                "Unable to open PDF: $uri"
-            )
+            ?: throw IllegalArgumentException("Unable to open PDF: $uri")
 
-        open(descriptor)
-    }
-
-    fun open(descriptor: ParcelFileDescriptor) {
-        close()
         fileDescriptor = descriptor
         renderer = PdfRenderer(descriptor)
+        cachedPageCount = renderer?.pageCount ?: 0
     }
 
+    @Synchronized
+    fun open(descriptor: ParcelFileDescriptor) {
+        close()
+
+        fileDescriptor = descriptor
+        renderer = PdfRenderer(descriptor)
+        cachedPageCount = renderer?.pageCount ?: 0
+    }
+
+    @Synchronized
     fun openPage(pageIndex: Int): PdfRenderer.Page {
         val pdfRenderer = renderer
             ?: throw IllegalStateException("PDF document is not open.")
 
-        require(pageIndex in 0 until pdfRenderer.pageCount) {
+        require(pageIndex in 0 until cachedPageCount) {
             "Invalid page index: $pageIndex"
         }
 
         return pdfRenderer.openPage(pageIndex)
     }
 
+    @Synchronized
+    fun pageSize(pageIndex: Int): Size {
+        val page = openPage(pageIndex)
+        return try {
+            Size(page.width, page.height)
+        } finally {
+            page.close()
+        }
+    }
+
+    @Synchronized
+    fun renderPage(
+        pageIndex: Int,
+        targetWidth: Int,
+        pageRenderer: PdfPageRenderer
+    ): Bitmap {
+        require(targetWidth > 0) { "Target width must be greater than zero." }
+
+        val page = openPage(pageIndex)
+        return try {
+            val scale = targetWidth.toFloat() / page.width.toFloat()
+            val targetHeight = (page.height * scale).toInt().coerceAtLeast(1)
+
+            pageRenderer.render(
+                page = page,
+                width = targetWidth,
+                height = targetHeight
+            )
+        } finally {
+            page.close()
+        }
+    }
+
+    @Synchronized
     override fun close() {
         renderer?.close()
         renderer = null
+        cachedPageCount = 0
+
         fileDescriptor?.close()
         fileDescriptor = null
     }
