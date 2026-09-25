@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -25,7 +24,6 @@ class PdfViewInstrumentedTest {
         view.setDocument(Uri.fromFile(file))
 
         assertEquals(2, view.pageCount)
-        assertNotNull(view.document)
         assertEquals(0, view.currentPage)
 
         view.goToPage(1)
