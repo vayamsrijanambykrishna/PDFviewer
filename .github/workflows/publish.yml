@@ -23,7 +23,6 @@ jobs:
           gradle-version: "9.6.0"
       - name: Publish artifacts
         env:
-          VERSION_NAME: ${{ github.ref_name }}
           MAVEN_REPOSITORY_URL: ${{ secrets.MAVEN_REPOSITORY_URL }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
