@@ -38,6 +38,7 @@ internal class RenderScheduler(
     )
     private val queued = HashMap<Int, RenderRequest>()
     private val inFlight = HashSet<Int>()
+    private val inFlightTargetWidths = HashMap<Int, Int>()
     private var sequence = 0L
 
     private val generation = AtomicInteger(0)
@@ -73,7 +74,8 @@ internal class RenderScheduler(
         if (pageIndex < 0 || targetWidth <= 0) return
 
         synchronized(lock) {
-            if (inFlight.contains(pageIndex)) return
+            val inFlightTarget = inFlightTargetWidths[pageIndex]
+            if (inFlightTarget != null && targetWidth <= inFlightTarget) return
 
             val current = queued[pageIndex]
             if (current != null &&
@@ -145,6 +147,7 @@ internal class RenderScheduler(
 
                 synchronized(lock) {
                     if (!inFlight.add(request.pageIndex)) continue
+                    inFlightTargetWidths[request.pageIndex] = request.targetWidth
                 }
 
                 try {
@@ -157,6 +160,7 @@ internal class RenderScheduler(
                     withContext(Dispatchers.Main.immediate) {
                         synchronized(lock) {
                             inFlight.remove(request.pageIndex)
+                            inFlightTargetWidths.remove(request.pageIndex)
                         }
 
                         if (request.generation == generation.get()) {
@@ -170,11 +174,13 @@ internal class RenderScheduler(
                 } catch (cancelled: CancellationException) {
                     synchronized(lock) {
                         inFlight.remove(request.pageIndex)
+                        inFlightTargetWidths.remove(request.pageIndex)
                     }
                     throw cancelled
                 } catch (error: Throwable) {
                     synchronized(lock) {
                         inFlight.remove(request.pageIndex)
+                        inFlightTargetWidths.remove(request.pageIndex)
                     }
 
                     withContext(Dispatchers.Main.immediate) {
@@ -202,6 +208,7 @@ internal class RenderScheduler(
             queue.clear()
             queued.clear()
             inFlight.clear()
+            inFlightTargetWidths.clear()
         }
         signal.close()
         scope.cancel()
