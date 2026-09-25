@@ -45,4 +45,4 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: ./gradlew :pdfviewer:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: gradle :pdfviewer:connectedDebugAndroidTest --no-daemon --stacktrace
