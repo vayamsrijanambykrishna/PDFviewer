@@ -6,10 +6,11 @@ plugins {
 
 android {
     namespace = "in.krishna.pdfviewer"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 28
+        targetSdk = 36
         consumerProguardFiles("consumer-rules.pro")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
