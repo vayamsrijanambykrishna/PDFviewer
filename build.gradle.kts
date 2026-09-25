@@ -5,5 +5,5 @@ plugins {
 
 allprojects {
     group = "in.krishna"
-    version = providers.gradleProperty("VERSION_NAME").orElse("0.8.0").get()
+    version = providers.gradleProperty("VERSION_NAME").orElse("0.8.1").get()
 }
