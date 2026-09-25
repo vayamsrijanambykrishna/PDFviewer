@@ -16,5 +16,5 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "9.0.0"
+          gradle-version: "9.6.0"
       - run: gradle :pdfviewer:assembleRelease :pdfviewer-compose:assembleRelease
