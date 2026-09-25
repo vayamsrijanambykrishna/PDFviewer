@@ -14,7 +14,7 @@ import `in`.krishna.pdfviewer.PdfViewerState
 fun PdfViewer(
     uri: Uri,
     modifier: Modifier = Modifier,
-    state: PdfViewerState = remember { PdfViewerState.create() }
+    state: PdfViewerState = remember { PdfViewerState() }
 ) {
     AndroidView(
         modifier = modifier.fillMaxSize(),
@@ -39,5 +39,3 @@ fun PdfViewer(
         onDispose { }
     }
 }
-
-private fun PdfViewerState.Companion.create(): PdfViewerState = PdfViewerState()
