@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
 import android.util.AttributeSet
 import android.util.Size
@@ -54,6 +55,8 @@ class PdfView @JvmOverloads constructor(
     private var scaleAnimator: ValueAnimator? = null
     private var zoomFocusX = 0f
     private var zoomFocusY = 0f
+    private var rotationDegrees = 0
+    private var pageChangeListener: ((Int) -> Unit)? = null
 
     private val pageSpacingPx =
         (8f * resources.displayMetrics.density).toInt()
@@ -151,6 +154,48 @@ class PdfView @JvmOverloads constructor(
 
     val zoom: Float
         get() = scaleFactor
+
+    val rotation: Int
+        get() = rotationDegrees
+
+    fun setOnPageChangedListener(listener: ((page: Int) -> Unit)?) {
+        pageChangeListener = listener
+    }
+
+    fun nextPage() {
+        if (currentPageIndex < pageCount - 1) showPage(currentPageIndex + 1)
+    }
+
+    fun previousPage() {
+        if (currentPageIndex > 0) showPage(currentPageIndex - 1)
+    }
+
+    fun goToPage(pageIndex: Int) = showPage(pageIndex)
+
+    fun rotate(clockwise: Boolean = true) {
+        rotationDegrees = (rotationDegrees + if (clockwise) 90 else -90 + 360) % 360
+        cancelScaleAnimation()
+        scaleFactor = 1f
+        panX = 0f
+        panY = 0f
+        pageCache.clear()
+        rebuildLayout()
+        requestVisiblePages()
+        invalidate()
+    }
+
+    fun resetRotation() {
+        if (rotationDegrees == 0) return
+        rotationDegrees = 0
+        cancelScaleAnimation()
+        scaleFactor = 1f
+        panX = 0f
+        panY = 0f
+        pageCache.clear()
+        rebuildLayout()
+        requestVisiblePages()
+        invalidate()
+    }
 
     init {
         setBackgroundColor(android.graphics.Color.WHITE)
@@ -255,13 +300,24 @@ class PdfView @JvmOverloads constructor(
 
         if (first <= last) {
             for (index in first..last) {
-                pageCache.get(index)?.let {
-                    canvas.drawBitmap(
-                        it,
-                        0f,
-                        pageTops[index].toFloat(),
-                        paint
-                    )
+                pageCache.get(index)?.let { bitmap ->
+                    if (rotationDegrees == 0) {
+                        canvas.drawBitmap(bitmap, 0f, pageTops[index].toFloat(), paint)
+                    } else {
+                        val pageWidth = bitmap.width.toFloat()
+                        val pageHeight = bitmap.height.toFloat()
+                        val centerX = pageWidth / 2f
+                        val centerY = pageTops[index] + pageHeight / 2f
+                        canvas.save()
+                        canvas.rotate(rotationDegrees.toFloat(), centerX, centerY)
+                        canvas.drawBitmap(
+                            bitmap,
+                            centerX - pageWidth / 2f,
+                            centerY - pageHeight / 2f,
+                            paint
+                        )
+                        canvas.restore()
+                    }
                 }
             }
         }
@@ -662,7 +718,12 @@ class PdfView @JvmOverloads constructor(
             }
         }
 
-        currentPageIndex = result
+        if (result != currentPageIndex) {
+            currentPageIndex = result
+            pageChangeListener?.invoke(result)
+        } else {
+            currentPageIndex = result
+        }
     }
 
     private fun animateScale(
