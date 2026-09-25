@@ -282,6 +282,11 @@ class PdfView @JvmOverloads constructor(
 
         documentGeneration++
 
+        if (document.pageCount > 0) {
+            currentPageIndex = 0
+            pageChangeListener?.invoke(0)
+        }
+
         scheduler = createScheduler()
         scheduler?.loadLayout()
         invalidate()
