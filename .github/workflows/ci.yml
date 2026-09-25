@@ -32,7 +32,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
-      - name: Install Android 37 SDK
+      - name: Install Android 36 SDK
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
@@ -45,7 +45,7 @@ jobs:
             exit 127
           fi
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platforms;android-37"
+          "$SDKMANAGER" "platforms;android-36"
       - name: Enable KVM
         run: |
           sudo apt-get update
