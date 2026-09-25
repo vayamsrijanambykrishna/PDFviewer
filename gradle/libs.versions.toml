@@ -1,5 +1,5 @@
 [versions]
-composeUi = "1.12.1"
+composeUi = "1.11.4"
 junit = "4.13.2"
 
 [libraries]
