@@ -55,9 +55,11 @@ class PdfView @JvmOverloads constructor(
     private var zoomFocusX = 0f
     private var zoomFocusY = 0f
     private var rotationDegrees = 0
+    private var minZoom = 1f
+    private var maxZoom = 3f
     private var pageChangeListener: ((Int) -> Unit)? = null
 
-    private val pageSpacingPx =
+    private var pageSpacingPx =
         (8f * resources.displayMetrics.density).toInt()
 
     private val gestureDetector = GestureDetector(
@@ -71,9 +73,9 @@ class PdfView @JvmOverloads constructor(
 
             override fun onDoubleTap(event: MotionEvent): Boolean {
                 val target = when {
-                    scaleFactor < 1.5f -> 2f
-                    scaleFactor < 2.5f -> 3f
-                    else -> 1f
+                    scaleFactor < 1.5f -> 2f.coerceAtMost(maxZoom)
+                    scaleFactor < 2.5f -> maxZoom
+                    else -> minZoom
                 }
                 animateScale(target, event.x, event.y)
                 return true
@@ -157,6 +159,20 @@ class PdfView @JvmOverloads constructor(
     val rotation: Int
         get() = rotationDegrees
 
+    fun applyConfig(config: PdfViewerConfig) {
+        pageSpacingPx = (config.pageSpacingDp * resources.displayMetrics.density)
+            .coerceAtLeast(0f)
+            .toInt()
+        minZoom = config.minZoom.coerceIn(1f, 3f)
+        maxZoom = config.maxZoom.coerceIn(minZoom, 3f)
+        setBackgroundColor(config.backgroundColor)
+        scaleFactor = scaleFactor.coerceIn(minZoom, maxZoom)
+        pageCache.clear()
+        rebuildLayout()
+        requestVisiblePages()
+        invalidate()
+    }
+
     fun setOnPageChangedListener(listener: ((page: Int) -> Unit)?) {
         pageChangeListener = listener
     }
@@ -174,7 +190,7 @@ class PdfView @JvmOverloads constructor(
     fun rotate(clockwise: Boolean = true) {
         rotationDegrees = (rotationDegrees + if (clockwise) 90 else -90 + 360) % 360
         cancelScaleAnimation()
-        scaleFactor = 1f
+        scaleFactor = minZoom
         panX = 0f
         panY = 0f
         pageCache.clear()
@@ -395,7 +411,7 @@ class PdfView @JvmOverloads constructor(
 
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
-            if (scaleFactor <= 1f) {
+            if (scaleFactor <= minZoom) {
                 scrollOffset = scroller.currY
                     .toFloat()
                     .coerceIn(0f, maxScrollOffset())
@@ -761,7 +777,7 @@ class PdfView @JvmOverloads constructor(
     ) {
         cancelScaleAnimation()
 
-        val clampedTarget = target.coerceIn(1f, 3f)
+        val clampedTarget = target.coerceIn(minZoom, maxZoom)
         if (abs(clampedTarget - scaleFactor) < 0.001f) return
 
         zoomFocusX = focusX
@@ -795,11 +811,11 @@ class PdfView @JvmOverloads constructor(
         focusX: Float,
         focusY: Float
     ) {
-        val newScale = target.coerceIn(1f, 3f)
+        val newScale = target.coerceIn(minZoom, maxZoom)
 
         if (abs(newScale - scaleFactor) < 0.0001f) return
 
-        if (newScale == 1f) {
+        if (newScale == minZoom) {
             scaleFactor = 1f
             panX = 0f
             panY = 0f
