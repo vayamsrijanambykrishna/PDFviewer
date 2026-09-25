@@ -1,0 +1,81 @@
+package `in`.krishna.pdfviewer
+
+import android.content.Context
+import android.graphics.pdf.PdfDocument
+import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+
+@RunWith(AndroidJUnit4::class)
+class PdfViewInstrumentedTest {
+
+    @Test
+    fun pdfView_canOpenLocalPdf_andExposePageCount() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(context.cacheDir, "instrumented-test.pdf")
+        createPdf(file)
+
+        val view = PdfView(context)
+        view.setDocument(Uri.fromFile(file))
+
+        assertEquals(2, view.pageCount)
+        assertNotNull(view.document)
+        assertEquals(0, view.currentPage)
+
+        view.goToPage(1)
+        assertEquals(1, view.currentPage)
+
+        view.closeDocument()
+        file.delete()
+    }
+
+    @Test
+    fun pdfView_rotation_and_navigation_areStateful() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(context.cacheDir, "rotation-test.pdf")
+        createPdf(file)
+
+        val view = PdfView(context)
+        view.setDocument(Uri.fromFile(file))
+
+        view.rotate()
+        assertEquals(90, view.rotation)
+
+        view.rotate()
+        assertEquals(180, view.rotation)
+
+        view.resetRotation()
+        assertEquals(0, view.rotation)
+
+        view.nextPage()
+        assertEquals(1, view.currentPage)
+
+        view.previousPage()
+        assertEquals(0, view.currentPage)
+
+        view.closeDocument()
+        file.delete()
+    }
+
+    private fun createPdf(file: File) {
+        val document = PdfDocument()
+        repeat(2) {
+            val page = document.startPage(
+                PdfDocument.PageInfo.Builder(600, 800, it).create()
+            )
+            page.canvas.drawText("PDFviewer test page $it", 40f, 80f, android.graphics.Paint())
+            document.finishPage(page)
+        }
+
+        file.outputStream().use { output ->
+            document.writeTo(output)
+        }
+        document.close()
+    }
+}
