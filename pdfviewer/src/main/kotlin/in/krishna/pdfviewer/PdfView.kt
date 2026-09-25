@@ -35,10 +35,7 @@ class PdfView @JvmOverloads constructor(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private val pageCache = PageCache(
-        maxBytes = (
-            context.resources.displayMetrics.widthPixels *
-                context.resources.displayMetrics.heightPixels * 4L * 3L
-            ).coerceIn(8L * 1024L * 1024L, 32L * 1024L * 1024L).toInt()
+        maxBytes = (Runtime.getRuntime().maxMemory() / 4).toInt()
     )
 
     private var scheduler: RenderScheduler? = null
@@ -701,8 +698,8 @@ class PdfView @JvmOverloads constructor(
         val lastVisible = lastVisiblePage()
 
         val direction = sign(lastScrollDirection).toInt()
-        val before = if (direction < 0) 3 else 2
-        val after = if (direction > 0) 3 else 2
+        val before = if (scaleFactor > 1.2f) 1 else if (direction < 0) 3 else 2
+        val after = if (scaleFactor > 1.2f) 1 else if (direction > 0) 3 else 2
 
         val first = (firstVisible - before).coerceAtLeast(0)
         val last = (lastVisible + after)
