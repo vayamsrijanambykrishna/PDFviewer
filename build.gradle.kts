@@ -4,5 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.20" apply false
 }
 
-group = "in.krishna"
-version = providers.gradleProperty("VERSION_NAME").orElse("0.8.0").get()
+allprojects {
+    group = "in.krishna"
+    version = providers.gradleProperty("VERSION_NAME").orElse("0.8.0").get()
+}
