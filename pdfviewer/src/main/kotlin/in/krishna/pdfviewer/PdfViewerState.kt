@@ -1,6 +1,6 @@
 package `in`.krishna.pdfviewer
 
-class PdfViewerState internal constructor() {
+class PdfViewerState {
     var currentPage: Int = -1
         internal set
 
