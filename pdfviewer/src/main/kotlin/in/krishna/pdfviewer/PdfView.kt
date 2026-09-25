@@ -6,16 +6,19 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
+import android.os.Parcel
+import android.os.Parcelable
 import android.util.AttributeSet
 import android.util.Size
 import android.view.GestureDetector
 import android.view.MotionEvent
-import android.widget.OverScroller
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.animation.DecelerateInterpolator
+import android.widget.OverScroller
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sign
@@ -60,7 +63,14 @@ class PdfView @JvmOverloads constructor(
     private var minZoom = 1f
     private var maxZoom = 3f
     private var pageChangeListener: ((Int) -> Unit)? = null
+    private var errorListener: ((Throwable) -> Unit)? = null
     private var memoryCallbacksRegistered = false
+
+    private var hasPendingSavedState = false
+    private var restoredPageIndex = -1
+    private var restoredScrollOffset = 0f
+    private var restoredZoom = 1f
+    private var restoredRotation = 0
 
     private val memoryCallbacks = object : ComponentCallbacks2 {
         override fun onConfigurationChanged(newConfig: Configuration) = Unit
@@ -120,11 +130,7 @@ class PdfView @JvmOverloads constructor(
                 velocityY: Float
             ): Boolean {
                 if (scaleFactor > minZoom) {
-                    val consumed = flingZoomed(
-                        velocityX,
-                        velocityY
-                    )
-                    return consumed
+                    return flingZoomed(velocityX, velocityY)
                 }
 
                 startVerticalFling(velocityY)
@@ -192,6 +198,10 @@ class PdfView @JvmOverloads constructor(
         pageChangeListener = listener
     }
 
+    fun setOnErrorListener(listener: ((Throwable) -> Unit)?) {
+        errorListener = listener
+    }
+
     fun nextPage() {
         if (currentPageIndex < pageCount - 1) showPage(currentPageIndex + 1)
     }
@@ -238,19 +248,38 @@ class PdfView @JvmOverloads constructor(
         pageCache.clear()
         document.close()
 
+        val restoreState = hasPendingSavedState
+
         pageSizes = emptyList()
         pageTops = IntArray(0)
         scrollOffset = 0f
         contentHeight = 0f
         currentPageIndex = -1
         pendingPageIndex = -1
-        scaleFactor = minZoom
+        scaleFactor = if (restoreState) {
+            restoredZoom.coerceIn(minZoom, maxZoom)
+        } else {
+            minZoom
+        }
         panX = 0f
         panY = 0f
         lastScrollDirection = 0f
-        rotationDegrees = 0
+        rotationDegrees = if (restoreState) {
+            ((restoredRotation % 360) + 360) % 360
+        } else {
+            0
+        }
 
-        document.open(uri)
+        val opened = document.open(uri) { error ->
+            notifyError(error)
+        }
+
+        if (!opened) {
+            documentGeneration++
+            invalidate()
+            return
+        }
+
         documentGeneration++
 
         scheduler = createScheduler()
@@ -308,11 +337,39 @@ class PdfView @JvmOverloads constructor(
         invalidate()
     }
 
+    override fun onSaveInstanceState(): Parcelable {
+        val superState = super.onSaveInstanceState()
+        return SavedState(superState).apply {
+            pageIndex = currentPageIndex
+            scrollOffset = this@PdfView.scrollOffset
+            zoom = scaleFactor
+            rotation = rotationDegrees
+        }
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        if (state is SavedState) {
+            super.onRestoreInstanceState(state.superState)
+            restoredPageIndex = state.pageIndex
+            restoredScrollOffset = state.scrollOffset
+            restoredZoom = state.zoom
+            restoredRotation = state.rotation
+            hasPendingSavedState = true
+        } else {
+            super.onRestoreInstanceState(state)
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (pageSizes.isEmpty()) return
 
         requestVisiblePages()
+
+        val viewportWidth =
+            (width - paddingLeft - paddingRight)
+                .toFloat()
+                .coerceAtLeast(0f)
 
         canvas.save()
         canvas.clipRect(
@@ -330,37 +387,42 @@ class PdfView @JvmOverloads constructor(
         val first = firstVisiblePage()
         val last = lastVisiblePage()
 
-        if (first <= last) {
+        if (first <= last && viewportWidth > 0f) {
             for (index in first..last) {
-                pageCache.get(index)?.let { bitmap ->
-                    val viewportWidth =
-                        (width - paddingLeft - paddingRight).toFloat()
+                val bitmap = pageCache.get(index) ?: continue
 
-                    if (rotationDegrees == 0) {
-                        canvas.drawBitmap(
-                            bitmap,
-                            0f,
-                            pageTops[index].toFloat(),
-                            paint
-                        )
-                    } else {
-                        val bitmapWidth = bitmap.width.toFloat()
-                        val bitmapHeight = bitmap.height.toFloat()
-                        val centerX = viewportWidth / 2f
-                        val centerY =
-                            pageTops[index] +
-                                rotatedPageSlotHeight(index, viewportWidth) / 2f
+                val pageHeight = rotatedPageSlotHeight(
+                    index,
+                    viewportWidth
+                )
 
-                        canvas.save()
-                        canvas.rotate(rotationDegrees.toFloat(), centerX, centerY)
-                        canvas.drawBitmap(
-                            bitmap,
-                            centerX - bitmapWidth / 2f,
-                            centerY - bitmapHeight / 2f,
-                            paint
-                        )
-                        canvas.restore()
-                    }
+                val destination = RectF(
+                    0f,
+                    pageTops[index].toFloat(),
+                    viewportWidth,
+                    pageTops[index] + pageHeight
+                )
+
+                if (rotationDegrees == 0) {
+                    canvas.drawBitmap(
+                        bitmap,
+                        null,
+                        destination,
+                        paint
+                    )
+                } else {
+                    val centerX = destination.centerX()
+                    val centerY = destination.centerY()
+
+                    canvas.save()
+                    canvas.rotate(rotationDegrees.toFloat(), centerX, centerY)
+                    canvas.drawBitmap(
+                        bitmap,
+                        null,
+                        destination,
+                        paint
+                    )
+                    canvas.restore()
                 }
             }
         }
@@ -396,8 +458,6 @@ class PdfView @JvmOverloads constructor(
                         val consumedX = panX - (beforeX - dx)
                         val consumedY = panY - (beforeY - dy)
 
-                        // When the zoomed content reaches a vertical edge,
-                        // hand the remaining drag back to document scrolling.
                         if (abs(dy) > abs(dx) &&
                             abs(consumedY - dy) > 0.5f
                         ) {
@@ -502,13 +562,32 @@ class PdfView @JvmOverloads constructor(
                 if (pageIndex < pageCount) {
                     pageCache.put(pageIndex, bitmap)
                     invalidate()
-                } else if (!bitmap.isRecycled) {
-                    bitmap.recycle()
                 }
             },
             onLayoutReady = { sizes, _ ->
                 pageSizes = sizes
                 rebuildLayout()
+
+                if (hasPendingSavedState) {
+                    val pageIndex = restoredPageIndex
+                        .takeIf { it in pageSizes.indices }
+                        ?: 0
+
+                    scrollOffset = restoredScrollOffset
+                        .takeIf { it.isFinite() }
+                        ?.coerceIn(0f, maxScrollOffset())
+                        ?: pageTops[pageIndex].toFloat()
+
+                    scaleFactor = restoredZoom
+                        .coerceIn(minZoom, maxZoom)
+                    rotationDegrees = ((restoredRotation % 360) + 360) % 360
+
+                    panX = 0f
+                    panY = 0f
+                    clampPan()
+                    hasPendingSavedState = false
+                    updateCurrentPage()
+                }
 
                 if (pendingPageIndex in pageSizes.indices) {
                     scrollOffset = pageTops[pendingPageIndex]
@@ -520,8 +599,17 @@ class PdfView @JvmOverloads constructor(
                 updateCurrentPage()
                 requestVisiblePages()
                 invalidate()
+            },
+            onError = { error ->
+                notifyError(error)
             }
         )
+    }
+
+    private fun notifyError(error: Throwable) {
+        post {
+            errorListener?.invoke(error)
+        }
     }
 
     private fun closeScheduler() {
@@ -588,7 +676,6 @@ class PdfView @JvmOverloads constructor(
             (width - paddingLeft - paddingRight)
                 .coerceAtLeast(1)
 
-        // Render above 1x while zoomed, capped to keep bitmap memory bounded.
         val qualityScale = scaleFactor.coerceAtMost(2f)
 
         if (pageSizes.isEmpty()) return
@@ -613,6 +700,7 @@ class PdfView @JvmOverloads constructor(
                 } else {
                     baseWidth.toDouble()
                 }
+
                 val targetWidth = (fitWidth * qualityScale)
                     .toLong()
                     .coerceAtMost(4096L)
@@ -920,5 +1008,43 @@ class PdfView @JvmOverloads constructor(
 
         panX = panX.coerceIn(-maxPanX(), maxPanX())
         panY = panY.coerceIn(-maxPanY(), maxPanY())
+    }
+
+    private class SavedState : BaseSavedState {
+        var pageIndex: Int = -1
+        var scrollOffset: Float = 0f
+        var zoom: Float = 1f
+        var rotation: Int = 0
+
+        constructor(superState: Parcelable?) : super(superState)
+
+        private constructor(source: Parcel) : super(source) {
+            pageIndex = source.readInt()
+            scrollOffset = source.readFloat()
+            zoom = source.readFloat()
+            rotation = source.readInt()
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeInt(pageIndex)
+            out.writeFloat(scrollOffset)
+            out.writeFloat(zoom)
+            out.writeInt(rotation)
+        }
+
+        companion object {
+            @JvmField
+            val CREATOR: Parcelable.Creator<SavedState> =
+                object : Parcelable.Creator<SavedState> {
+                    override fun createFromParcel(source: Parcel): SavedState {
+                        return SavedState(source)
+                    }
+
+                    override fun newArray(size: Int): Array<SavedState?> {
+                        return arrayOfNulls(size)
+                    }
+                }
+        }
     }
 }

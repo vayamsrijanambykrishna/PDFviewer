@@ -10,10 +10,14 @@ internal class PageCache(
     private var currentBytes = 0L
 
     @Synchronized
-    fun get(pageIndex: Int): Bitmap? = entries[pageIndex]
+    fun get(pageIndex: Int): Bitmap? {
+        return entries[pageIndex]?.takeUnless { it.isRecycled }
+    }
 
     @Synchronized
-    fun contains(pageIndex: Int): Boolean = entries.containsKey(pageIndex)
+    fun contains(pageIndex: Int): Boolean {
+        return entries[pageIndex]?.let { !it.isRecycled } == true
+    }
 
     @Synchronized
     fun put(pageIndex: Int, bitmap: Bitmap) {
@@ -21,7 +25,6 @@ internal class PageCache(
 
         entries.remove(pageIndex)?.let {
             currentBytes -= it.byteCount.toLong()
-            recycle(it)
         }
 
         entries[pageIndex] = bitmap
@@ -31,10 +34,8 @@ internal class PageCache(
 
     @Synchronized
     fun clear() {
-        val values = entries.values.toList()
         entries.clear()
         currentBytes = 0L
-        values.forEach(::recycle)
     }
 
     @Synchronized
@@ -60,16 +61,10 @@ internal class PageCache(
 
     private fun removeOldest() {
         val iterator = entries.entries.iterator()
-
         if (iterator.hasNext()) {
             val entry = iterator.next()
             currentBytes -= entry.value.byteCount.toLong()
             iterator.remove()
-            recycle(entry.value)
         }
-    }
-
-    private fun recycle(bitmap: Bitmap) {
-        if (!bitmap.isRecycled) bitmap.recycle()
     }
 }

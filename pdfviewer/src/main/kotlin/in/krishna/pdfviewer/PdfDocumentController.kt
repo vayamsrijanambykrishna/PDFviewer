@@ -23,25 +23,47 @@ internal class PdfDocumentController(
         @Synchronized get() = renderer != null
 
     @Synchronized
-    fun open(uri: Uri) {
+    fun open(
+        uri: Uri,
+        onError: ((Throwable) -> Unit)? = null
+    ): Boolean {
         close()
 
-        val descriptor = context.contentResolver
-            .openFileDescriptor(uri, "r")
-            ?: throw IllegalArgumentException("Unable to open PDF: $uri")
+        return try {
+            val descriptor = context.contentResolver
+                .openFileDescriptor(uri, "r")
+                ?: throw IllegalArgumentException("Unable to open PDF: $uri")
 
-        fileDescriptor = descriptor
-        renderer = PdfRenderer(descriptor)
-        cachedPageCount = renderer?.pageCount ?: 0
+            val pdfRenderer = PdfRenderer(descriptor)
+            fileDescriptor = descriptor
+            renderer = pdfRenderer
+            cachedPageCount = pdfRenderer.pageCount
+            true
+        } catch (error: Throwable) {
+            close()
+            onError?.invoke(error)
+            false
+        }
     }
 
     @Synchronized
-    fun open(descriptor: ParcelFileDescriptor) {
+    fun open(
+        descriptor: ParcelFileDescriptor,
+        onError: ((Throwable) -> Unit)? = null
+    ): Boolean {
         close()
 
-        fileDescriptor = descriptor
-        renderer = PdfRenderer(descriptor)
-        cachedPageCount = renderer?.pageCount ?: 0
+        return try {
+            val pdfRenderer = PdfRenderer(descriptor)
+            fileDescriptor = descriptor
+            renderer = pdfRenderer
+            cachedPageCount = pdfRenderer.pageCount
+            true
+        } catch (error: Throwable) {
+            close()
+            onError?.invoke(error)
+            false
+        }
     }
 
     @Synchronized

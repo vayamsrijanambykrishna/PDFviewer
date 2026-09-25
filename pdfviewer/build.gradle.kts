@@ -1,6 +1,6 @@
 plugins {
     id("com.android.library")
-        id("maven-publish")
+    id("maven-publish")
     id("signing")
 }
 
@@ -86,8 +86,9 @@ if (!signingKey.isNullOrBlank() && !signingPassword.isNullOrBlank()) {
     }
 }
 
-
 dependencies {
+    implementation(libs.compose.runtime)
+    implementation(libs.coroutines.android)
     testImplementation(libs.junit)
     androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

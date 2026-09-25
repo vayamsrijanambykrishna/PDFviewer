@@ -17,7 +17,7 @@ fun PdfViewer(
     state: PdfViewerState = remember { PdfViewerState() }
 ) {
     val context = LocalContext.current
-    val pdfView = remember { PdfView(context) }
+    val pdfView = remember(context) { PdfView(context) }
 
     AndroidView(
         modifier = modifier,
@@ -35,6 +35,7 @@ fun PdfViewer(
             state.pageCount = pdfView.pageCount
             state.zoom = pdfView.zoom
         }
+
         onDispose {
             pdfView.setOnPageChangedListener(null)
             pdfView.closeDocument()
