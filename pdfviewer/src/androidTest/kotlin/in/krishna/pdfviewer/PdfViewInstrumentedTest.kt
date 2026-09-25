@@ -26,6 +26,10 @@ class PdfViewInstrumentedTest {
         assertEquals(2, view.pageCount)
         assertEquals(0, view.currentPage)
 
+        view.setDocument(Uri.fromFile(file))
+        assertEquals(2, view.pageCount)
+        assertEquals(0, view.currentPage)
+
         view.goToPage(1)
         assertEquals(1, view.currentPage)
 
