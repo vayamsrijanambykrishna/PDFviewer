@@ -1,7 +1,6 @@
 package `in`.krishna.pdfviewer.compose
 
 import android.net.Uri
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -21,7 +20,7 @@ fun PdfViewer(
     val pdfView = remember { PdfView(context) }
 
     AndroidView(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier,
         factory = { pdfView },
         update = { view ->
             state.currentPage = view.currentPage
