@@ -709,8 +709,7 @@ class PdfView @JvmOverloads constructor(
             .coerceAtMost(pageSizes.lastIndex)
 
         for (index in first..last) {
-            if (pageCache.get(index) == null) {
-                val size = pageSizes[index]
+            val size = pageSizes[index]
                 val rotated = rotationDegrees == 90 || rotationDegrees == 270
                 val fitWidth = if (rotated) {
                     baseWidth.toDouble() * size.width.toDouble() / size.height.toDouble()
@@ -724,7 +723,7 @@ class PdfView @JvmOverloads constructor(
                     .toInt()
                     .coerceAtLeast(1)
 
-                val priority = when {
+            val priority = when {
                     index in firstVisible..lastVisible -> 100
                     direction > 0 && index > lastVisible ->
                         80 - (index - lastVisible)
@@ -733,6 +732,8 @@ class PdfView @JvmOverloads constructor(
                     else -> 50
                 }
 
+            val cached = pageCache.get(index)
+            if (cached == null || cached.width < targetWidth) {
                 localScheduler.request(
                     pageIndex = index,
                     targetWidth = targetWidth,
@@ -953,7 +954,6 @@ class PdfView @JvmOverloads constructor(
             panY = 0f
             scrollOffset =
                 scrollOffset.coerceIn(0f, maxScrollOffset())
-            pageCache.clear()
             requestVisiblePages()
             invalidate()
             return
@@ -986,7 +986,8 @@ class PdfView @JvmOverloads constructor(
                 scrollOffset
 
         clampPan()
-        pageCache.clear()
+        // Keep the current bitmap during pinch. Canvas scaling gives immediate
+        // visual feedback while a higher-resolution replacement renders off the UI thread.
         requestVisiblePages()
         invalidate()
     }
