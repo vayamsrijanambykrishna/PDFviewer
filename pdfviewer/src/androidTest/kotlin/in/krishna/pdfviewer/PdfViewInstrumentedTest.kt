@@ -108,6 +108,83 @@ class PdfViewInstrumentedTest {
     }
 
     @Test
+    fun pdfView_keepsCurrentBitmapVisibleDuringZoom() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(context.cacheDir, "zoom-cache-test.pdf")
+        createPdf(file)
+
+        val view = PdfView(context)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            view.setDocument(Uri.fromFile(file))
+            view.measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                    600,
+                    android.view.View.MeasureSpec.EXACTLY
+                ),
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                    800,
+                    android.view.View.MeasureSpec.EXACTLY
+                )
+            )
+            view.layout(0, 0, 600, 800)
+        }
+
+        val deadline = System.currentTimeMillis() + 5_000L
+        var rendered = false
+        while (System.currentTimeMillis() < deadline && !rendered) {
+            val bitmap = android.graphics.Bitmap.createBitmap(
+                600,
+                800,
+                android.graphics.Bitmap.Config.ARGB_8888
+            )
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                bitmap.eraseColor(android.graphics.Color.WHITE)
+                view.draw(android.graphics.Canvas(bitmap))
+            }
+            rendered = hasNonWhitePixel(bitmap)
+            bitmap.recycle()
+            if (!rendered) android.os.SystemClock.sleep(50L)
+        }
+
+        org.junit.Assert.assertTrue(
+            "Expected a rendered page before zoom",
+            rendered
+        )
+
+        val setScale = PdfView::class.java.getDeclaredMethod(
+            "setScale",
+            Float::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType
+        ).apply {
+            isAccessible = true
+        }
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            setScale.invoke(view, 2f, 300f, 400f)
+        }
+
+        val zoomedBitmap = android.graphics.Bitmap.createBitmap(
+            600,
+            800,
+            android.graphics.Bitmap.Config.ARGB_8888
+        )
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            zoomedBitmap.eraseColor(android.graphics.Color.WHITE)
+            view.draw(android.graphics.Canvas(zoomedBitmap))
+        }
+
+        org.junit.Assert.assertTrue(
+            "Expected the existing bitmap to remain visible during zoom",
+            hasNonWhitePixel(zoomedBitmap)
+        )
+
+        zoomedBitmap.recycle()
+        view.closeDocument()
+        file.delete()
+    }
+
+    @Test
     fun pdfView_rotation_and_navigation_areStateful() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val file = File(context.cacheDir, "rotation-test.pdf")
@@ -133,6 +210,17 @@ class PdfViewInstrumentedTest {
 
         view.closeDocument()
         file.delete()
+    }
+
+    private fun hasNonWhitePixel(bitmap: android.graphics.Bitmap): Boolean {
+        for (y in 0 until bitmap.height step 8) {
+            for (x in 0 until bitmap.width step 8) {
+                if (android.graphics.Color.red(bitmap.getPixel(x, y)) < 245) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     private fun createPdf(file: File) {
