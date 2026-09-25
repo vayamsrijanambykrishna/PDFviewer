@@ -33,7 +33,19 @@ jobs:
         with:
           gradle-version: "9.6.0"
       - name: Install Android 37 SDK
-        run: sdkmanager "platforms;android-37"
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$SDK_ROOT/tools/bin/sdkmanager"
+          fi
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
+            find "$SDK_ROOT" -name sdkmanager -type f -print
+            exit 127
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-37"
       - name: Enable KVM
         run: |
           sudo apt-get update
