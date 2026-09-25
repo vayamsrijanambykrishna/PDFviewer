@@ -816,7 +816,7 @@ class PdfView @JvmOverloads constructor(
         if (abs(newScale - scaleFactor) < 0.0001f) return
 
         if (newScale == minZoom) {
-            scaleFactor = 1f
+            scaleFactor = minZoom
             panX = 0f
             panY = 0f
             scrollOffset =
@@ -885,7 +885,7 @@ class PdfView @JvmOverloads constructor(
     }
 
     private fun clampPan() {
-        if (scaleFactor <= 1f) {
+        if (scaleFactor <= minZoom) {
             panX = 0f
             panY = 0f
             return
