@@ -25,13 +25,11 @@ internal class RenderScheduler(
     )
 
     private val lock = Any()
-
     private val queue = PriorityBlockingQueue(
         11,
         compareByDescending<RenderRequest> { it.priority }
             .thenBy { it.sequence }
     )
-
     private val queued = HashMap<Int, RenderRequest>()
     private val inFlight = HashSet<Int>()
     private var sequence = 0L
@@ -51,24 +49,16 @@ internal class RenderScheduler(
     }
 
     fun loadLayout() {
-        val requestGeneration = generation.get()
-
-        executor.execute {
-            try {
-                val sizes = ArrayList<Size>(document.pageCount)
-
-                for (index in 0 until document.pageCount) {
-                    sizes += document.pageSize(index)
-                }
-
-                mainHandler.post {
-                    if (requestGeneration == generation.get()) {
-                        onLayoutReady(sizes, requestGeneration)
-                    }
-                }
-            } catch (_: Throwable) {
-                // The document may have been closed while the request was running.
-            }
+        synchronized(lock) {
+            val request = RenderRequest(
+                pageIndex = -1,
+                targetWidth = 0,
+                priority = Int.MAX_VALUE,
+                generation = generation.get(),
+                sequence = sequence++
+            )
+            queued[-1] = request
+            queue.offer(request)
         }
     }
 
@@ -77,13 +67,12 @@ internal class RenderScheduler(
         targetWidth: Int,
         priority: Int = 0
     ) {
-        if (targetWidth <= 0) return
+        if (pageIndex < 0 || targetWidth <= 0) return
 
         synchronized(lock) {
             if (inFlight.contains(pageIndex)) return
 
             val current = queued[pageIndex]
-
             if (current != null &&
                 current.targetWidth >= targetWidth &&
                 current.priority >= priority
@@ -91,9 +80,7 @@ internal class RenderScheduler(
                 return
             }
 
-            current?.let {
-                queue.remove(it)
-            }
+            current?.let(queue::remove)
 
             val request = RenderRequest(
                 pageIndex = pageIndex,
@@ -119,10 +106,29 @@ internal class RenderScheduler(
 
             synchronized(lock) {
                 if (queued[request.pageIndex] !== request) continue
-
                 queued.remove(request.pageIndex)
-
                 if (request.generation != generation.get()) continue
+            }
+
+            if (request.pageIndex == -1) {
+                try {
+                    val sizes = ArrayList<Size>(document.pageCount)
+                    for (index in 0 until document.pageCount) {
+                        sizes += document.pageSize(index)
+                    }
+
+                    mainHandler.post {
+                        if (request.generation == generation.get()) {
+                            onLayoutReady(sizes, request.generation)
+                        }
+                    }
+                } catch (_: Throwable) {
+                    // The document may have been closed while the request was running.
+                }
+                continue
+            }
+
+            synchronized(lock) {
                 if (!inFlight.add(request.pageIndex)) continue
             }
 
