@@ -4,9 +4,9 @@ import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.util.Size
-import java.util.PriorityQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class RenderScheduler(
@@ -25,7 +25,9 @@ internal class RenderScheduler(
     )
 
     private val lock = Any()
-    private val queue = PriorityQueue<RenderRequest>(
+
+    private val queue = PriorityBlockingQueue(
+        11,
         compareByDescending<RenderRequest> { it.priority }
             .thenBy { it.sequence }
     )
@@ -81,6 +83,7 @@ internal class RenderScheduler(
             if (inFlight.contains(pageIndex)) return
 
             val current = queued[pageIndex]
+
             if (current != null &&
                 current.targetWidth >= targetWidth &&
                 current.priority >= priority
@@ -102,34 +105,24 @@ internal class RenderScheduler(
 
             queued[pageIndex] = request
             queue.offer(request)
-            lock.notifyAll()
         }
     }
 
     private fun drainQueue() {
         while (!executor.isShutdown) {
-            val request = synchronized(lock) {
-                while (queue.isEmpty() && !executor.isShutdown) {
-                    try {
-                        lock.wait()
-                    } catch (_: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        return
-                    }
-                }
-
-                if (executor.isShutdown) return
-
-                val next = queue.poll()
-                if (next != null) {
-                    queued.remove(next.pageIndex)
-                }
-                next
-            } ?: continue
-
-            if (request.generation != generation.get()) continue
+            val request = try {
+                queue.take()
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return
+            }
 
             synchronized(lock) {
+                if (queued[request.pageIndex] !== request) continue
+
+                queued.remove(request.pageIndex)
+
+                if (request.generation != generation.get()) continue
                 if (!inFlight.add(request.pageIndex)) continue
             }
 
@@ -154,14 +147,11 @@ internal class RenderScheduler(
                     } else if (!bitmap.isRecycled) {
                         bitmap.recycle()
                     }
-
-                    signalQueue()
                 }
             } catch (_: Throwable) {
                 synchronized(lock) {
                     inFlight.remove(request.pageIndex)
                 }
-                signalQueue()
             }
         }
     }
@@ -171,7 +161,6 @@ internal class RenderScheduler(
             generation.incrementAndGet()
             queue.clear()
             queued.clear()
-            lock.notifyAll()
         }
     }
 
@@ -179,11 +168,5 @@ internal class RenderScheduler(
         cancelAll()
         executor.shutdownNow()
         mainHandler.removeCallbacksAndMessages(null)
-    }
-
-    private fun signalQueue() {
-        synchronized(lock) {
-            lock.notifyAll()
-        }
     }
 }
