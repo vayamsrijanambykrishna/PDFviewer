@@ -104,7 +104,7 @@ class PdfView @JvmOverloads constructor(
                 velocityX: Float,
                 velocityY: Float
             ): Boolean {
-                if (scaleFactor > 1f) {
+                if (scaleFactor > minZoom) {
                     val consumed = flingZoomed(
                         velocityX,
                         velocityY
@@ -255,7 +255,7 @@ class PdfView @JvmOverloads constructor(
 
         cancelScaleAnimation()
         if (scaleFactor != minZoom) {
-            scaleFactor = 1f
+            scaleFactor = minZoom
             panX = 0f
             panY = 0f
             pageCache.clear()
