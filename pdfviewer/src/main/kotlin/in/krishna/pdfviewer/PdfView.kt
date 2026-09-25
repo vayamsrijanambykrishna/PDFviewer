@@ -360,11 +360,22 @@ class PdfView @JvmOverloads constructor(
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
 
-        if (level >= TRIM_MEMORY_RUNNING_LOW) {
-            pageCache.trimForMemoryPressure()
-            requestVisiblePages()
-            invalidate()
+        when {
+            level >= TRIM_MEMORY_COMPLETE -> {
+                pageCache.clear()
+                scheduler?.cancelAll()
+            }
+            level >= TRIM_MEMORY_RUNNING_CRITICAL -> {
+                pageCache.trimToBytes(4L * 1024L * 1024L)
+                scheduler?.cancelAll()
+            }
+            level >= TRIM_MEMORY_RUNNING_LOW -> {
+                pageCache.trimForMemoryPressure()
+            }
         }
+
+        requestVisiblePages()
+        invalidate()
     }
 
     override fun onDetachedFromWindow() {
@@ -454,10 +465,17 @@ class PdfView @JvmOverloads constructor(
 
     private fun requestVisiblePages() {
         val localScheduler = scheduler ?: return
-        val availableWidth =
-            ((width - paddingLeft - paddingRight) / scaleFactor)
-                .toInt()
+        val baseWidth =
+            (width - paddingLeft - paddingRight)
                 .coerceAtLeast(1)
+
+        // Render above 1x while zoomed, capped to keep bitmap memory bounded.
+        val qualityScale = scaleFactor.coerceAtMost(2f)
+        val targetWidth = (baseWidth * qualityScale)
+            .toLong()
+            .coerceAtMost(4096L)
+            .toInt()
+            .coerceAtLeast(1)
 
         if (pageSizes.isEmpty()) return
 
@@ -474,7 +492,20 @@ class PdfView @JvmOverloads constructor(
 
         for (index in first..last) {
             if (pageCache.get(index) == null) {
-                localScheduler.request(index, availableWidth)
+                val priority = when {
+                    index in firstVisible..lastVisible -> 100
+                    direction > 0 && index > lastVisible ->
+                        80 - (index - lastVisible)
+                    direction < 0 && index < firstVisible ->
+                        80 - (firstVisible - index)
+                    else -> 50
+                }
+
+                localScheduler.request(
+                    pageIndex = index,
+                    targetWidth = targetWidth,
+                    priority = priority.coerceAtLeast(1)
+                )
             }
         }
     }
