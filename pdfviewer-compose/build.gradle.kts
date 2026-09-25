@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "in.krishna.pdfviewer.compose"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 28
