@@ -3,7 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("maven-publish")
     id("signing")
-    id("kotlin-android")
 }
 
 android {
