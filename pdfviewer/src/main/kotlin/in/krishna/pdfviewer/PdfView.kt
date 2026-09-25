@@ -1,7 +1,9 @@
 package `in`.krishna.pdfviewer
 
 import android.animation.ValueAnimator
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.net.Uri
@@ -9,7 +11,7 @@ import android.util.AttributeSet
 import android.util.Size
 import android.view.GestureDetector
 import android.view.MotionEvent
-import android.view.OverScroller
+import android.widget.OverScroller
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewConfiguration
@@ -58,6 +60,19 @@ class PdfView @JvmOverloads constructor(
     private var minZoom = 1f
     private var maxZoom = 3f
     private var pageChangeListener: ((Int) -> Unit)? = null
+    private var memoryCallbacksRegistered = false
+
+    private val memoryCallbacks = object : ComponentCallbacks2 {
+        override fun onConfigurationChanged(newConfig: Configuration) = Unit
+
+        override fun onLowMemory() {
+            handleTrimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
+        }
+
+        override fun onTrimMemory(level: Int) {
+            handleTrimMemory(level)
+        }
+    }
 
     private var pageSpacingPx =
         (8f * resources.displayMetrics.density).toInt()
@@ -441,30 +456,42 @@ class PdfView @JvmOverloads constructor(
         requestVisiblePages()
     }
 
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!memoryCallbacksRegistered) {
+            context.applicationContext.registerComponentCallbacks(memoryCallbacks)
+            memoryCallbacksRegistered = true
+        }
+    }
 
+    override fun onDetachedFromWindow() {
+        if (memoryCallbacksRegistered) {
+            context.applicationContext.unregisterComponentCallbacks(memoryCallbacks)
+            memoryCallbacksRegistered = false
+        }
+        closeDocument()
+        super.onDetachedFromWindow()
+    }
+
+    private fun handleTrimMemory(level: Int) {
         when {
-            level >= TRIM_MEMORY_COMPLETE -> {
+            level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
                 pageCache.clear()
                 scheduler?.cancelAll()
             }
-            level >= TRIM_MEMORY_RUNNING_CRITICAL -> {
+            level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
                 pageCache.trimToBytes(4L * 1024L * 1024L)
                 scheduler?.cancelAll()
             }
-            level >= TRIM_MEMORY_RUNNING_LOW -> {
+            level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> {
                 pageCache.trimForMemoryPressure()
             }
         }
 
-        requestVisiblePages()
-        invalidate()
-    }
-
-    override fun onDetachedFromWindow() {
-        closeDocument()
-        super.onDetachedFromWindow()
+        if (isAttachedToWindow) {
+            requestVisiblePages()
+            invalidate()
+        }
     }
 
     private fun createScheduler(): RenderScheduler {
