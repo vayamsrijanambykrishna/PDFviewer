@@ -217,6 +217,7 @@ class PdfView @JvmOverloads constructor(
         panX = 0f
         panY = 0f
         lastScrollDirection = 0f
+        rotationDegrees = 0
 
         document.open(uri)
         documentGeneration++
@@ -270,6 +271,7 @@ class PdfView @JvmOverloads constructor(
         panX = 0f
         panY = 0f
         lastScrollDirection = 0f
+        rotationDegrees = 0
         documentGeneration++
 
         invalidate()
@@ -545,11 +547,6 @@ class PdfView @JvmOverloads constructor(
 
         // Render above 1x while zoomed, capped to keep bitmap memory bounded.
         val qualityScale = scaleFactor.coerceAtMost(2f)
-        val targetWidth = (baseWidth * qualityScale)
-            .toLong()
-            .coerceAtMost(4096L)
-            .toInt()
-            .coerceAtLeast(1)
 
         if (pageSizes.isEmpty()) return
 
@@ -566,6 +563,19 @@ class PdfView @JvmOverloads constructor(
 
         for (index in first..last) {
             if (pageCache.get(index) == null) {
+                val size = pageSizes[index]
+                val rotated = rotationDegrees == 90 || rotationDegrees == 270
+                val fitWidth = if (rotated) {
+                    baseWidth.toDouble() * size.width.toDouble() / size.height.toDouble()
+                } else {
+                    baseWidth.toDouble()
+                }
+                val targetWidth = (fitWidth * qualityScale)
+                    .toLong()
+                    .coerceAtMost(4096L)
+                    .toInt()
+                    .coerceAtLeast(1)
+
                 val priority = when {
                     index in firstVisible..lastVisible -> 100
                     direction > 0 && index > lastVisible ->
