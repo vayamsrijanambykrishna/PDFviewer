@@ -209,6 +209,7 @@ class PdfView @JvmOverloads constructor(
         oldh: Int
     ) {
         super.onSizeChanged(w, h, oldw, oldh)
+        scheduler?.cancelAll()
         pageCache.clear()
         rebuildLayout()
         requestVisiblePages()
@@ -230,13 +231,11 @@ class PdfView @JvmOverloads constructor(
     }
 
     private fun createScheduler(): RenderScheduler {
-        val generationToken = documentGeneration
-
         return RenderScheduler(
             document = document,
             pageRenderer = pageRenderer,
-            onRendered = { pageIndex, bitmap, generation ->
-                if (generation == generationToken && pageIndex < pageCount) {
+            onRendered = { pageIndex, bitmap, _ ->
+                if (pageIndex < pageCount) {
                     pageCache.put(pageIndex, bitmap)
                     updateCurrentPage()
                     invalidate()
@@ -244,21 +243,19 @@ class PdfView @JvmOverloads constructor(
                     bitmap.recycle()
                 }
             },
-            onLayoutReady = { sizes, generation ->
-                if (generation == generationToken) {
-                    pageSizes = sizes
-                    rebuildLayout()
+            onLayoutReady = { sizes, _ ->
+                pageSizes = sizes
+                rebuildLayout()
 
-                    if (pendingPageIndex in pageSizes.indices) {
-                        scrollOffset = pageTops[pendingPageIndex]
-                            .coerceIn(0, maxScrollOffset())
-                        pendingPageIndex = -1
-                        updateCurrentPage()
-                    }
-
-                    requestVisiblePages()
-                    invalidate()
+                if (pendingPageIndex in pageSizes.indices) {
+                    scrollOffset = pageTops[pendingPageIndex]
+                        .coerceIn(0, maxScrollOffset())
+                    pendingPageIndex = -1
+                    updateCurrentPage()
                 }
+
+                requestVisiblePages()
+                invalidate()
             }
         )
     }
@@ -292,6 +289,7 @@ class PdfView @JvmOverloads constructor(
                         size.width.toDouble()
                     ).toInt()
                 )
+            )
 
             pageTops[index] =
                 top.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
