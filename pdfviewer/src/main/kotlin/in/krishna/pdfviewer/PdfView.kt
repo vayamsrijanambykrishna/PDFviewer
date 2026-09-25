@@ -4,7 +4,6 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RectF
 import android.net.Uri
 import android.util.AttributeSet
 import android.util.Size
@@ -301,19 +300,30 @@ class PdfView @JvmOverloads constructor(
         if (first <= last) {
             for (index in first..last) {
                 pageCache.get(index)?.let { bitmap ->
+                    val viewportWidth =
+                        (width - paddingLeft - paddingRight).toFloat()
+
                     if (rotationDegrees == 0) {
-                        canvas.drawBitmap(bitmap, 0f, pageTops[index].toFloat(), paint)
+                        canvas.drawBitmap(
+                            bitmap,
+                            0f,
+                            pageTops[index].toFloat(),
+                            paint
+                        )
                     } else {
-                        val pageWidth = bitmap.width.toFloat()
-                        val pageHeight = bitmap.height.toFloat()
-                        val centerX = pageWidth / 2f
-                        val centerY = pageTops[index] + pageHeight / 2f
+                        val bitmapWidth = bitmap.width.toFloat()
+                        val bitmapHeight = bitmap.height.toFloat()
+                        val centerX = viewportWidth / 2f
+                        val centerY =
+                            pageTops[index] +
+                                rotatedPageSlotHeight(index, viewportWidth) / 2f
+
                         canvas.save()
                         canvas.rotate(rotationDegrees.toFloat(), centerX, centerY)
                         canvas.drawBitmap(
                             bitmap,
-                            centerX - pageWidth / 2f,
-                            centerY - pageHeight / 2f,
+                            centerX - bitmapWidth / 2f,
+                            centerY - bitmapHeight / 2f,
                             paint
                         )
                         canvas.restore()
@@ -489,16 +499,10 @@ class PdfView @JvmOverloads constructor(
         var top = 0L
 
         for (index in pageSizes.indices) {
-            val size = pageSizes[index]
-            val pageHeight = max(
-                1,
-                (
-                    availableWidth.toDouble() *
-                        size.height.toDouble() /
-                        size.width.toDouble()
-                    ).toInt()
-                )
-            )
+            val pageHeight = rotatedPageSlotHeight(
+                index,
+                availableWidth.toFloat()
+            ).toInt().coerceAtLeast(1)
 
             pageTops[index] =
                 top.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
@@ -517,6 +521,20 @@ class PdfView @JvmOverloads constructor(
             scrollOffset.coerceIn(0f, maxScrollOffset())
 
         updateCurrentPage()
+    }
+
+    private fun rotatedPageSlotHeight(
+        pageIndex: Int,
+        availableWidth: Float
+    ): Float {
+        val size = pageSizes[pageIndex]
+        val rotated = rotationDegrees == 90 || rotationDegrees == 270
+
+        return if (!rotated) {
+            availableWidth * size.height.toFloat() / size.width.toFloat()
+        } else {
+            availableWidth * size.width.toFloat() / size.height.toFloat()
+        }
     }
 
     private fun requestVisiblePages() {
