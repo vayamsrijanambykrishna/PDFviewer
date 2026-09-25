@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("maven-publish")
     id("signing")
+    id("kotlin-android")
 }
 
 android {
@@ -12,6 +13,7 @@ android {
     defaultConfig {
         minSdk = 28
         consumerProguardFiles("consumer-rules.pro")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     publishing {
@@ -84,4 +86,11 @@ if (!signingKey.isNullOrBlank() && !signingPassword.isNullOrBlank()) {
         useInMemoryPgpKeys(signingKey, signingPassword)
         sign(publishing.publications["release"])
     }
+}
+
+
+dependencies {
+    testImplementation(libs.junit)
+    androidTestImplementation("androidx.test:core:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
 }
