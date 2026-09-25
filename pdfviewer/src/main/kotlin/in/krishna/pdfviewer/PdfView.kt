@@ -518,7 +518,19 @@ class PdfView @JvmOverloads constructor(
         pageCache.clear()
         rebuildLayout()
         clampPan()
-        requestVisiblePages()
+
+        // A resize can happen immediately after setDocument(). In that case
+        // cancelAll() invalidates the pending layout request. Re-enqueue it
+        // while the document is open so pageSizes can be populated again.
+        if (document.pageCount > 0 && w > 0 && h > 0) {
+            if (pageSizes.isEmpty()) {
+                scheduler?.loadLayout()
+            } else {
+                requestVisiblePages()
+            }
+        } else {
+            requestVisiblePages()
+        }
     }
 
     override fun onAttachedToWindow() {
