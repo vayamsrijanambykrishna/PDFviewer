@@ -81,3 +81,33 @@ Internal rendering, scheduling and caching classes are not part of the supported
 
 - Android API 28+
 - A readable PDF `Uri` exposed through `ContentResolver`
+
+## Artifacts
+
+Core:
+
+    implementation("in.krishna:pdfviewer:0.8.0")
+
+Compose adapter:
+
+    implementation("in.krishna:pdfviewer-compose:0.8.0")
+
+The Compose artifact is separate so the core library does not require Jetpack Compose.
+
+## Configuration
+
+    pdfView.applyConfig(
+        PdfViewerConfig(
+            pageSpacingDp = 8f,
+            backgroundColor = Color.WHITE,
+            maxZoom = 3f
+        )
+    )
+
+## Release
+
+Release and CI details are documented in docs/RELEASING.md. Maven publication is configured for in.krishna:pdfviewer and in.krishna:pdfviewer-compose with optional PGP signing.
+
+## License
+
+Apache License 2.0. See LICENSE.
