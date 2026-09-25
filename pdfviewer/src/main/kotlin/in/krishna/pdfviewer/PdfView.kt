@@ -87,7 +87,7 @@ class PdfView @JvmOverloads constructor(
                 distanceX: Float,
                 distanceY: Float
             ): Boolean {
-                if (scaleFactor > 1f) {
+                if (scaleFactor > minZoom) {
                     panX -= distanceX
                     panY -= distanceY
                     clampPan()
@@ -188,7 +188,7 @@ class PdfView @JvmOverloads constructor(
     fun goToPage(pageIndex: Int) = showPage(pageIndex)
 
     fun rotate(clockwise: Boolean = true) {
-        rotationDegrees = (rotationDegrees + if (clockwise) 90 else -90 + 360) % 360
+        rotationDegrees = ((rotationDegrees + if (clockwise) 90 else -90) + 360) % 360
         cancelScaleAnimation()
         scaleFactor = minZoom
         panX = 0f
@@ -203,7 +203,7 @@ class PdfView @JvmOverloads constructor(
         if (rotationDegrees == 0) return
         rotationDegrees = 0
         cancelScaleAnimation()
-        scaleFactor = 1f
+        scaleFactor = minZoom
         panX = 0f
         panY = 0f
         pageCache.clear()
@@ -229,7 +229,7 @@ class PdfView @JvmOverloads constructor(
         contentHeight = 0f
         currentPageIndex = -1
         pendingPageIndex = -1
-        scaleFactor = 1f
+        scaleFactor = minZoom
         panX = 0f
         panY = 0f
         lastScrollDirection = 0f
@@ -254,7 +254,7 @@ class PdfView @JvmOverloads constructor(
         }
 
         cancelScaleAnimation()
-        if (scaleFactor != 1f) {
+        if (scaleFactor != minZoom) {
             scaleFactor = 1f
             panX = 0f
             panY = 0f
@@ -283,7 +283,7 @@ class PdfView @JvmOverloads constructor(
         contentHeight = 0f
         currentPageIndex = -1
         pendingPageIndex = -1
-        scaleFactor = 1f
+        scaleFactor = minZoom
         panX = 0f
         panY = 0f
         lastScrollDirection = 0f
