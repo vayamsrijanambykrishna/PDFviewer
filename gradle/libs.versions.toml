@@ -1,0 +1,7 @@
+[versions]
+composeUi = "1.12.1"
+junit = "4.13.2"
+
+[libraries]
+compose-ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
+junit = { module = "junit:junit", version.ref = "junit" }
