@@ -1,0 +1,2 @@
+-keepclassmembers class in.krishna.pdfviewer.model.** { *; }
+-keepclassmembers class in.krishna.pdfviewer.core.PdfEngine { *; }
