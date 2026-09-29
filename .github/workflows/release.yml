@@ -1,0 +1,41 @@
+name: Create Automatic Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Release Version Tag (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+      release_title:
+        description: 'Release Title'
+        required: false
+        default: 'Release'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Git Tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.event.inputs.version_tag }}
+          TITLE: ${{ github.event.inputs.release_title }}
+        run: |
+          gh release create "$TAG_NAME" \
+            --title "$TITLE $TAG_NAME" \
+            --notes "PDF Viewer Library Release $TAG_NAME" \
+            --target main
+
+      - name: Trigger JitPack Build
+        run: |
+          TAG="${{ github.event.inputs.version_tag }}"
+          echo "Triggering JitPack build for tag: $TAG"
+          curl -s "https://jitpack.io/api/builds/vayamsrijanambykrishna/PDFviewer/$TAG"
