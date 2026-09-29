@@ -4,25 +4,33 @@ plugins {
     alias(libs.plugins.compose.compiler)
     `maven-publish`
 }
+
 android {
     namespace = "in.krishna.pdfviewer"
     compileSdk = 36
+
     defaultConfig {
         minSdk = 28
         consumerProguardFiles("consumer-rules.pro")
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { 
-        jvmTarget = "17" 
+
+    kotlinOptions {
+        jvmTarget = "17"
         freeCompilerArgs = freeCompilerArgs + listOf(
             "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
         )
     }
-    buildFeatures { compose = true }
+
+    buildFeatures {
+        compose = true
+    }
+
     publishing {
         singleVariant("release") {
             withSourcesJar()
@@ -40,6 +48,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 }
+
 afterEvaluate {
     publishing {
         publications {
