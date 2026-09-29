@@ -2,9 +2,11 @@ jdk:
   - openjdk17
 
 before_install:
+  - if [ ! -f ./gradlew ]; then gradle wrapper; fi
   - chmod +x ./gradlew
-  - yes | sdkmanager --licenses || true
-  - sdkmanager "platforms;android-36"
+  - mkdir -p $ANDROID_HOME/licenses
+  - echo -e "24333f8a63cbd8248e1b796727e28ae7ec910d9e\n89338d0d9b1836777c1da4d31f2d6d0083f33a5c\nd56f5187479451eabf01fb78af6dfcb131a6481e" > $ANDROID_HOME/licenses/android-sdk-license
+  - echo -e "84831b9409646a5d80e445340e104926dae00c3f" > $ANDROID_HOME/licenses/android-sdk-preview-license
 
 install:
   - ./gradlew :pdfviewer:publishToMavenLocal -x test
