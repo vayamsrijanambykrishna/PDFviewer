@@ -1,4 +1,10 @@
 jdk:
   - openjdk17
+
+before_install:
+  - chmod +x ./gradlew
+  - yes | sdkmanager --licenses || true
+  - sdkmanager "platforms;android-36"
+
 install:
-  - gradle :pdfviewer:publishToMavenLocal
+  - ./gradlew :pdfviewer:publishToMavenLocal -x test
