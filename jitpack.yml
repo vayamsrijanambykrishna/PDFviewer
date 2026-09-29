@@ -5,9 +5,6 @@ before_install:
   - curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o gradle-8.7-bin.zip
   - unzip -q -o gradle-8.7-bin.zip
   - chmod +x ./gradle-8.7/bin/gradle
-  - mkdir -p /opt/android-sdk-linux/licenses $ANDROID_HOME/licenses
-  - printf "89338d0d9b1836777c1da4d31f2d6d0083f33a5c\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63cbd8248e1b796727e28ae7ec910d9e\n7ff6db22d9e9c8cd8e0eb72f8965ab7a14845cb7\n601085b94cd77f0b54ff86406957099fed8072d0\n" | tee /opt/android-sdk-linux/licenses/android-sdk-license > /dev/null
-  - printf "84831b9409646a5d80e445340e104926dae00c3f\n504667f4c0de7af1a06de9f4b1727b84351f2910\n" | tee /opt/android-sdk-linux/licenses/android-sdk-preview-license > /dev/null
 
 install:
   - ./gradle-8.7/bin/gradle :pdfviewer:publishToMavenLocal -x test -Pandroid.builder.sdkDownload=true -Pandroid.suppressUnsupportedCompileSdk=36
