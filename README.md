@@ -31,17 +31,20 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = java.net.URI("[https://jitpack.io](https://jitpack.io)") } // Add this line
+        maven { url = java.net.URI("https://jitpack.io") } // Add this line
     }
 }
+```
 
 Step 2. Add the dependency to your app-level build.gradle.kts:
-dependencies {
+```dependencies {
     implementation("com.github.vayamsrijanambykrishna:PDFviewer:v1.0.0")
 }
+```
 
 🚀 Quick Start
 Using the PDF Viewer is incredibly simple. Just pass the Uri of your PDF file:
+```
 import `in`.krishna.pdfviewer.ui.PdfViewer
 import `in`.krishna.pdfviewer.model.rememberPdfViewerState
 
@@ -58,9 +61,11 @@ fun MyPdfScreen(pdfUri: Uri) {
         modifier = Modifier.fillMaxSize()
     )
 }
+```
 
 🎨 Advanced Customization
 You can easily theme the viewer to match your app's branding using PdfViewerDefaults.colors() and configure behaviors via PdfViewerConfig.
+```
 PdfViewer(
     uri = pdfUri,
     title = "Advanced Kotlin Coroutines.pdf", // Custom title for Marquee
@@ -81,8 +86,8 @@ PdfViewer(
     ),
     modifier = Modifier.fillMaxSize()
 )
-
-🤝 Contribution
+```
+# 🤝 Contribution
 Pull requests are welcome! If you find a bug or have a feature request, please open an issue.
 📄 License
 This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
